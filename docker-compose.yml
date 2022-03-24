@@ -1,0 +1,75 @@
+version: "3.7"
+services:
+    # image project
+    basis:
+        build: 
+            args: 
+                user: ${APP_NAME}
+                uid: 1000
+            context: ./
+            dockerfile: Dockerfile
+        image: basis
+        restart: unless-stopped
+        working_dir: /var/www/
+        volumes:
+            - ./:/var/www
+        depends_on: 
+            - redis
+            - queue
+        networks: 
+            - basis_network
+    
+    # nginx
+    nginx:
+        image: nginx:alpine
+        restart: unless-stopped
+        ports: 
+            - 80:80
+            - 443:443
+        volumes: 
+            - ./:/var/www
+            - ./docker/nginx/:/etc/nginx/conf.d/
+        networks: 
+            - basis_network
+
+    # queue
+    queue:
+        build: 
+            args: 
+                user: ${APP_NAME}
+                uid: 1000
+            context: ./
+            dockerfile: Dockerfile
+        restart: unless-stopped
+        command: "php artisan queue:work"
+        volumes: 
+            - ./:/var/www
+        depends_on: 
+            - redis
+        networks: 
+            - basis_network
+
+    # redis
+    redis:
+        image: redis:latest
+        networks: 
+            - basis_network
+
+    adminer:
+        image: phpmyadmin/phpmyadmin
+        container_name: basis_phpmyadmin
+        restart: unless-stopped
+        tty: true
+        ports:
+          - "8080:80"
+        environment:
+          PMA_HOST: mysql
+          UPLOAD_LIMIT: 300M
+        depends_on:
+          - mysql
+        networks:
+          - basis_network    
+
+networks: 
+    basis_network:
+        driver: bridge
